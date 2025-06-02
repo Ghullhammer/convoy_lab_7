@@ -18,7 +18,7 @@ def test_hello_endpoint(client):
     assert response.status_code == 200
     
     data = json.loads(response.data)
-    assert data['message'] == "Hello from MyApp!"
+    assert data['message'] == "Hello World"
     assert data['version'] == "1.0.0"
     assert 'timestamp' in data
 

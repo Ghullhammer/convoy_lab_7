@@ -4,6 +4,9 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+def test(str):
+    print(str)
+    
 @app.route('/')
 def hello():
     return jsonify({
