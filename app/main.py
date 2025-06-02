@@ -5,7 +5,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 def test(str):
-    print(str)
+    print("Changes")
     
 @app.route('/')
 def hello():
