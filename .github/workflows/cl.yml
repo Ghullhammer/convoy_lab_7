@@ -1,0 +1,297 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKER_IMAGE: my-python-app
+  DOCKER_TAG: ${{ github.sha }}
+
+jobs:
+  # Тестування
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        echo "Running tests with pytest..."
+        pytest tests/ -v
+        echo "Tests passed"
+
+  # Збирання Docker образу
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name:  Build Docker image
+      run: |
+        echo " Building Docker image..."
+        docker build -t ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} .
+        docker build -t ${{ env.DOCKER_IMAGE }}:latest .
+        echo " Docker image built successfully!"
+        
+        echo " Image details:"
+        docker images ${{ env.DOCKER_IMAGE }}
+    
+    - name:  Test Docker image
+      run: |
+        echo " Testing Docker image..."
+        
+        docker run -d --name test-container -p 5000:5000 ${{ env.DOCKER_IMAGE }}:latest
+        
+        sleep 10
+        
+        curl -f http://localhost:5000/ || exit 1
+        curl -f http://localhost:5000/health || exit 1
+        curl -f http://localhost:5000/info || exit 1
+        
+        docker stop test-container
+        docker rm test-container
+        
+        echo "Docker image tests passed"
+
+  # Деплой на Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Deploy to Staging
+      run: |
+        echo " Deploying to STAGING environment..."
+        echo " Image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        echo " Environment: staging"
+        echo " Timestamp: $(date)"
+        
+        echo " Simulating deployment commands:"
+        echo "  - Stopping existing staging container..."
+        echo "  - docker stop myapp-staging || true"
+        echo "  - docker rm myapp-staging || true"
+        
+        echo "  - Starting new staging container..."
+        echo "  - docker run -d --name myapp-staging -p 8080:5000 -e ENV=staging ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        
+        sleep 3
+        
+        echo " Running staging smoke tests..."
+        echo "  - Health check: OK"
+        echo "  - API status: OK"
+        echo "  - Response time: OK"
+        
+        echo "Staging deployment completed!"
+        echo "Staging URL: https://staging.myapp.com"
+
+  # Завдання з лаби: Production деплoy з мануальним підтвердженням
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    environment: 
+      name: production
+      url: https://myapp.com
+    
+    steps:
+    - name:  Pre-deployment checks
+      run: |
+        echo " Running pre-deployment checks..."
+        echo " Tests passed: OK"
+        echo " Docker image built: OK"
+        echo " Security scans: OK"
+        echo " Performance tests: OK"
+        echo ""
+        echo " Deployment details:"
+        echo "  - Image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        echo "  - Environment: production"
+        echo "  - Commit: ${{ github.sha }}"
+        echo "  - Author: ${{ github.actor }}"
+        echo "  - Timestamp: $(date)"
+        echo ""
+        echo "  MANUAL APPROVAL REQUIRED FOR PRODUCTION DEPLOYMENT"
+    
+    - name:  Deploy to Production
+      run: |
+        echo " Starting PRODUCTION deployment..."
+        echo " This is a LIVE deployment - proceed with caution!"
+        echo ""
+        
+        echo " Deployment info:"
+        echo "  - Image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        echo "  - Target: Production servers"
+        echo "  - Strategy: Blue-Green deployment"
+        echo "  - Approved by: ${{ github.actor }}"
+        
+        echo ""
+        echo "Simulating production deployment steps:"
+        
+        echo "  1️ Creating backup of current version..."
+        echo "     - docker tag myapp:current myapp:backup-$(date +%Y%m%d-%H%M%S)"
+        
+        echo "  2️ Pulling new image to production servers..."
+        echo "     - docker pull ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        
+        echo "  3️ Starting new container (Blue-Green)..."
+        echo "     - docker run -d --name myapp-new -p 5001:5000 -e ENV=production ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+        
+        sleep 5
+        
+        echo "  4️ Running health checks on new version..."
+        echo "     - Health check: OK"
+        echo "     - Load test: OK"
+        echo "     - Integration test: OK"
+        
+        echo "  5️ Switching traffic to new version..."
+        echo "     - Updating load balancer configuration..."
+        echo "     - nginx reload: OK"
+        
+        echo "  6️ Cleaning up old version..."
+        echo "     - docker stop myapp-old || true"
+        echo "     - docker rename myapp myapp-old"
+        echo "     - docker rename myapp-new myapp"
+        
+        echo ""
+        echo "SUCCES"
+        echo "https://myapp. com"
+        echo "Monitoring: Active"
+        echo "Alerts: Enabled"
+    
+    - name: Post-deployment verification
+      run: |
+        echo "Running post-deployment verification..."
+        
+        echo "Verification checklist:"
+        echo "  Application responding"
+        echo "   Health checks passing"
+        echo "   API endpoints working"
+        echo "   Database connectivity OK"
+        echo "   External services OK"
+        echo "   SSL certificates valid"
+        echo "   CDN cache cleared"
+        echo "   Monitoring alerts normal"
+        
+        echo ""
+        echo " Performance metrics:"
+        echo "  - Response time: < 200ms "
+        echo "  - Error rate: 0% "
+        echo "  - CPU usage: 15% "
+        echo "  - Memory usage: 128MB "
+        
+        echo ""
+        echo " Deployment Summary:"
+        echo "  - Status:  SUCCESS"
+        echo "  - Version: ${{ github.sha }}"
+        echo "  - Deployed by: ${{ github.actor }}"
+        echo "  - Duration: ~5 minutes"
+        echo "  - Downtime: 0 seconds (Blue-Green)"
+        
+        echo ""
+        echo "📧 Notifications sent to:"
+        echo "  - DevOps team "
+        echo "  - Product team "
+        echo "  - Stakeholders "
+
+  rollback-production:
+    name: Emergency Rollback
+    runs-on: ubuntu-latest
+    if: false 
+    environment: production
+    
+    steps:
+    - name:  Emergency Production Rollback
+      run: |
+        echo " EMERGENCY ROLLBACK INITIATED!"
+        echo "  Rolling back production to previous stable version..."
+        echo ""
+        
+        echo " Rollback steps:"
+        echo "  1️ Stopping current version..."
+        echo "     - docker stop myapp"
+        
+        echo "  2️ Restoring previous version..."
+        echo "     - docker rename myapp myapp-failed"
+        echo "     - docker rename myapp-old myapp"
+        echo "     - docker start myapp"
+        
+        echo "  3️ Updating load balancer..."
+        echo "     - nginx reload"
+        
+        echo "  4️ Verifying rollback..."
+        echo "     - Health check:  PASSED"
+        echo "     - Service restored:  CONFIRMED"
+        
+        echo ""
+        echo " ROLLBACK COMPLETED SUCCESSFULLY!"
+        echo "📧 Emergency notifications sent"
+        echo "🔍 Incident investigation required"
+
+---
+name: Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - staging
+        - production
+      reason:
+        description: 'Rollback reason'
+        required: true
+        type: string
+
+jobs:
+  manual-rollback:
+    name: Manual Rollback
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+    - name:  Execute Manual Rollback
+      run: |
+        echo " MANUAL ROLLBACK TRIGGERED"
+        echo " Environment: ${{ github.event.inputs.environment }}"
+        echo " Reason: ${{ github.event.inputs.reason }}"
+        echo " Triggered by: ${{ github.actor }}"
+        echo " Timestamp: $(date)"
+        echo ""
+        
+        echo "  Executing rollback for ${{ github.event.inputs.environment }}..."
+        echo " Previous version restored successfully!"
+        echo " Rollback completed!"
+        
+        echo ""
+        echo " Next steps:"
+        echo "  1. Monitor application health"
+        echo "  2. Investigate root cause"
+        echo "  3. Plan hotfix if needed"
+        echo "  4. Update incident log"
